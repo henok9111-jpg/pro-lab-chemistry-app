@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Process Control Chemistry Lab - Hourly QC System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0fdfa',
+                            100: '#ccfbf1',
+                            500: '#14b8a6',
+                            600: '#0d9488',
+                            700: '#0f766e',
+                            800: '#115e59',
+                            900: '#134e4a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="h-full flex flex-col font-sans antialiased bg-slate-950 text-slate-100 selection:bg-teal-500 selection:text-white">
+    <header class="no-print bg-slate-900/90 backdrop-blur border-b border-slate-800 sticky top-0 z-30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-lg bg-gradient-to-tr from-teal-600 to-emerald-400 flex items-center justify-center shadow-lg shadow-teal-500/20">
+                    <i class="fa-solid fa-flask-vial text-slate-950 text-xl font-bold"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+                        PROCESS CONTROL <span class="text-xs font-semibold px-2 py-0.5 rounded bg-teal-950 text-teal-400 border border-teal-800/50">LAB</span>
+                    </h1>
+                    <p class="text-xs text-slate-400 hidden sm:block">Cement Plant Chemistry & Hourly Process Control Monitoring</p>
+                </div>
+            </div>
+
+            <div class="flex items-center space-x-3 sm:space-x-4">
+                <div id="backup-status-tag" class="hidden sm:flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs text-slate-300">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span>Local DB: Active</span>
+                </div>
+
+                <button id="download-backup-btn" onclick="downloadJsonBackup()" class="p-2 text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition" title="Quick PC Backup (.JSON)">
+                    <i class="fa-solid fa-download text-sm"></i>
+                </button>
+
+                <div class="relative group">
+                    <button class="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700/80 px-3 py-1.5 rounded-lg border border-slate-700 transition">
+                        <div id="user-avatar" class="w-7 h-7 rounded-full bg-teal-600 text-white flex items-center justify-center font-bold text-xs">AD</div>
+                        <div class="text-left hidden md:block">
+                            <div id="user-display-name" class="text-xs font-semibold text-white">Alex Morgan</div>
+                            <div id="user-display-role" class="text-[10px] text-teal-400 uppercase tracking-wider font-mono">Admin / Manager</div>
+                        </div>
+                        <i class="fa-solid fa-chevron-down text-xs text-slate-400"></i>
+                    </button>
+                    <div class="absolute right-0 mt-1 w-64 bg-slate-900 rounded-xl shadow-2xl border border-slate-800 py-2 hidden group-hover:block z-50">
+                        <div class="px-3 py-2 border-b border-slate-800">
+                            <p class="text-xs text-slate-400">Switch Login Profile:</p>
+                        </div>
+                        <button onclick="switchRole('admin')" class="w-full text-left px-3 py-2 text-xs hover:bg-slate-800 flex items-center justify-between">
+                            <div>
+                                <p class="font-medium text-slate-200">Alex Morgan</p>
+                                <p class="text-[10px] text-teal-400">Admin / Lab Manager</p>
+                            </div>
+                            <span class="text-[10px] bg-teal-950 text-teal-300 px-1.5 py-0.5 rounded border border-teal-800">Full Access</span>
+                        </button>
+                        <button onclick="switchRole('chemist')" class="w-full text-left px-3 py-2 text-xs hover:bg-slate-800 flex items-center justify-between">
+                            <div>
+                                <p class="font-medium text-slate-200">Sarah Chen</p>
+                                <p class="text-[10px] text-cyan-400">Shift Lead Chemist</p>
+                            </div>
+                            <span class="text-[10px] bg-cyan-950 text-cyan-300 px-1.5 py-0.5 rounded border border-cyan-800">Lab & Reports</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <nav class="no-print bg-slate-900/60 border-b border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-1 overflow-x-auto py-2" id="main-nav-tabs">
+            <button onclick="setActiveTab('dashboard')" id="nav-dashboard" class="nav-tab active flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium transition text-teal-400 bg-teal-950/60 border border-teal-800/60">
+                <i class="fa-solid fa-chart-line"></i> Dashboard & Analytics
+            </button>
+            <button onclick="setActiveTab('raw-materials')" id="nav-raw-materials" class="nav-tab flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium transition text-slate-400 hover:text-slate-200 hover:bg-slate-800">
+                <i class="fa-solid fa-truck-ramp-box"></i> Raw Material Receiving
+            </button>
+            <button onclick="setActiveTab('hourly-log')" id="nav-hourly-log" class="nav-tab flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium transition text-slate-400 hover:text-slate-200 hover:bg-slate-800">
+                <i class="fa-solid fa-vial"></i> Hourly Process Control
+            </button>
+            <button onclick="setActiveTab('moduli-calc')" id="nav-moduli-calc" class="nav-tab flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium transition text-slate-400 hover:text-slate-200 hover:bg-slate-800">
+                <i class="fa-solid fa-calculator"></i> Quality Moduli Engine
+            </button>
+            <button onclick="setActiveTab('reports')" id="nav-reports" class="nav-tab flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium transition text-slate-400 hover:text-slate-200 hover:bg-slate-800">
+                <i class="fa-solid fa-file-contract"></i> Reports & Export
+            </button>
+            <button onclick="setActiveTab('settings')" id="nav-settings" class="nav-tab flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium transition text-slate-400 hover:text-slate-200 hover:bg-slate-800">
+                <i class="fa-solid fa-database"></i> Local DB & Settings
+            </button>
+        </div>
+    </nav>
+
+    <div class="no-print bg-gradient-to-r from-teal-950/80 via-slate-900 to-indigo-950/80 border-b border-teal-900/40 px-4 py-2.5">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs">
+            <div class="flex items-center gap-2 text-teal-300">
+                <span class="px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30 text-[10px] font-bold uppercase tracking-wide flex items-center gap-1">
+                    <i class="fa-solid fa-sliders"></i> SOP Target Alignment
+                </span>
+                <span>Active Target LSF Range: <strong id="sop-target-lsf-display" class="text-white">95.0 - 98.0</strong> | SM Range: <strong id="sop-target-sm-display" class="text-white">2.30 - 2.70</strong></span>
+            </div>
+            <button onclick="openSopMappingModal()" class="px-2.5 py-1 bg-teal-600 hover:bg-teal-500 text-white rounded font-medium text-[11px] transition shadow flex items-center gap-1">
+                <i class="fa-solid fa-sliders"></i> Adjust SOP Parameters
+            </button>
+        </div>
+    </div>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        <section id="tab-dashboard" class="space-y-6">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-slate-900 rounded-xl p-4 border border-slate-800 shadow-sm relative overflow-hidden">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-xs font-medium text-slate-400">Raw Material Received</p>
+                            <h3 id="kpi-mat-tonnes" class="text-2xl font-bold text-white mt-1">0.0 <span class="text-xs font-normal text-slate-400">Tonnes</span></h3>
+                        </div>
+                        <div class="p-2.5 bg-teal-500/10 text-teal-400 rounded-lg">
+                            <i class="fa-solid fa-truck-field text-lg"></i>
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-2 flex items-center gap-1">
+                        <span id="kpi-mat-count" class="text-teal-400 font-semibold">0</span> deliveries logged
+                    </p>
+                </div>
+
+                <div class="bg-slate-900 rounded-xl p-4 border border-slate-800 shadow-sm relative overflow-hidden">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-xs font-medium text-slate-400">Avg Kiln Feed LSF</p>
+                            <h3 id="kpi-avg-lsf" class="text-2xl font-bold text-white mt-1">96.4</h3>
+                        </div>
+                        <div class="p-2.5 bg-emerald-500/10 text-emerald-400 rounded-lg">
+                            <i class="fa-solid fa-gauge-high text-lg"></i>
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-emerald-400 mt-2 flex items-center gap-1">
+                        <i class="fa-solid fa-circle-check"></i> Target: <span id="kpi-target-lsf-str">95.0 - 98.0</span>
+                    </p>
+                </div>
+
+                <div class="bg-slate-900 rounded-xl p-4 border border-slate-800 shadow-sm relative overflow-hidden">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-xs font-medium text-slate-400">Avg Coal GCV</p>
+                            <h3 id="kpi-coal-gcv" class="text-2xl font-bold text-white mt-1">5,840 <span class="text-xs font-normal text-slate-400">kcal/kg</span></h3>
+                        </div>
+                        <div class="p-2.5 bg-amber-500/10 text-amber-400 rounded-lg">
+                            <i class="fa-solid fa-fire text-lg"></i>
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-2 flex items-center gap-1">
+                        Moisture avg: <span id="kpi-coal-moisture" class="text-amber-400 font-semibold">8.2%</span>
+                    </p>
+                </div>
+
+                <div class="bg-slate-900 rounded-xl p-4 border border-slate-800 shadow-sm relative overflow-hidden">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-xs font-medium text-slate-400">Quality Out-of-Spec</p>
+                            <h3 id="kpi-alerts-count" class="text-2xl font-bold text-emerald-400 mt-1">0</h3>
+                        </div>
+                        <div class="p-2.5 bg-indigo-500/10 text-indigo-400 rounded-lg">
+                            <i class="fa-solid fa-shield-halved text-lg"></i>
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-slate-400 mt-2 flex items-center gap-1">Hourly test checks active</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-slate-900 p-5 rounded-xl border border-slate-800 space-y-4">
+                    <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-chart-line text-teal-400"></i> Hourly Quality Moduli Trend (LSF & SM)
+                    </h3>
+                    <div class="h-64 relative">
+                        <canvas id="lsfTrendChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900 p-5 rounded-xl border border-slate-800 space-y-4">
+                    <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-chart-column text-indigo-400"></i> Raw Material Intake Tonnage
+                    </h3>
+                    <div class="h-64 relative">
+                        <canvas id="materialTonnageChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-slate-900 rounded-xl border border-slate-800 p-5 space-y-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-clock-rotate-left text-teal-400"></i> Recent Operational Activity
+                    </h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs text-slate-300">
+                        <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
+                            <tr>
+                                <th class="py-2.5 px-3">Timestamp</th>
+                                <th class="py-2.5 px-3">Module</th>
+                                <th class="py-2.5 px-3">Reference / Sample</th>
+                                <th class="py-2.5 px-3">Key Value</th>
+                                <th class="py-2.5 px-3">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recent-activity-tbody" class="divide-y divide-slate-800/60"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section id="tab-raw-materials" class="hidden space-y-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 p-4 rounded-xl border border-slate-800">
+                <div>
+                    <h2 class="text-base font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-truck-ramp-box text-amber-400"></i> Raw Material Receiving & Stock Entry
+                    </h2>
+                    <p class="text-xs text-slate-400">Manage delivery tickets, weighbridge records, and proximate lab quality analysis.</p>
+                </div>
+                <button onclick="openRawMaterialModal()" class="px-3.5 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-semibold transition shadow flex items-center gap-2">
+                    <i class="fa-solid fa-plus"></i> New Material Ticket
+                </button>
+            </div>
+
+            <div class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden shadow-sm">
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[1200px] text-left text-xs text-slate-300">
+                        <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
+                            <tr>
+                                <th class="py-3 px-3">Date & Time</th>
+                                <th class="py-3 px-3">Ticket No</th>
+                                <th class="py-3 px-3">Material</th>
+                                <th class="py-3 px-3">Supplier Name</th>
+                                <th class="py-3 px-3 text-right">Net Wt (T)</th>
+                                <th class="py-3 px-3 text-right">Moisture %</th>
+                                <th class="py-3 px-3 text-right">Ash %</th>
+                                <th class="py-3 px-3 text-right">GCV (kcal/kg)</th>
+                                <th class="py-3 px-3 text-center">QC Status</th>
+                                <th class="py-3 px-3 text-center">Action</th>
+                                <th class="py-3 px-3">Audit Timestamp</th>
+                            </tr>
+                        </thead>
+                        <tbody id="raw-materials-tbody" class="divide-y divide-slate-800/80"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section id="tab-hourly-log" class="hidden space-y-6">
+            <div class="bg-gradient-to-r from-teal-950 via-slate-900 to-indigo-950 rounded-xl border border-teal-800/60 p-4">
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                    <div>
+                        <div class="flex items-center gap-2 text-teal-300 text-[11px] font-bold uppercase tracking-wider">
+                            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                            Live hourly process-control register
+                        </div>
+                        <p class="text-xs text-slate-300 mt-1">Record one laboratory result for each operating hour and use the calculated moduli to guide process adjustment.</p>
+                        <div class="flex flex-wrap gap-1.5 mt-3">
+                            <span class="px-2 py-1 rounded bg-slate-950/70 border border-slate-700 text-[10px] text-slate-200">Raw Mill</span>
+                            <span class="px-2 py-1 rounded bg-slate-950/70 border border-slate-700 text-[10px] text-slate-200">Kiln #1</span>
+                            <span class="px-2 py-1 rounded bg-slate-950/70 border border-slate-700 text-[10px] text-slate-200">Kiln #2</span>
+                            <span class="px-2 py-1 rounded bg-slate-950/70 border border-slate-700 text-[10px] text-slate-200">Cement Mill #2</span>
+                            <span class="px-2 py-1 rounded bg-slate-950/70 border border-slate-700 text-[10px] text-slate-200">Cement Mill #3</span>
+                        </div>
+                    </div>
+                    <div class="flex gap-2 text-center">
+                        <div class="bg-slate-950/60 rounded-lg border border-slate-700 px-3 py-2">
+                            <div id="hourly-log-count" class="text-lg font-bold text-white">0</div>
+                            <div class="text-[10px] text-slate-400 uppercase">Records</div>
+                        </div>
+                        <div class="bg-slate-950/60 rounded-lg border border-slate-700 px-3 py-2">
+                            <div class="text-lg font-bold text-teal-300">1 h</div>
+                            <div class="text-[10px] text-slate-400 uppercase">Frequency</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900 p-4 rounded-xl border border-slate-800">
+                <div>
+                    <h2 class="text-base font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-vial-circle-check text-teal-400"></i> Hourly Quality Logbook & Chemical Moduli
+                    </h2>
+                    <p class="text-xs text-slate-400">Hourly process-control oxide checks with automatic LSF, SM, and AM trending for kiln/feed correction.</p>
+                </div>
+                <button onclick="openHourlyLogModal()" class="px-3.5 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-lg text-xs font-semibold transition shadow flex items-center gap-2">
+                    <i class="fa-solid fa-plus"></i> Record Process Hour Sample
+                </button>
+            </div>
+            <div class="flex items-center gap-3 bg-slate-900 rounded-xl border border-slate-800 p-3">
+                <label for="hourly-shift-filter" class="text-xs text-slate-400">Shift average:</label>
+                <select id="hourly-shift-filter" onchange="renderHourlyLogTable()" class="bg-slate-950 border border-slate-800 rounded px-3 py-1.5 text-xs text-white">
+                    <option value="Shift A">Shift A</option>
+                    <option value="Shift B">Shift B</option>
+                    <option value="Shift C">Shift C</option>
+                </select>
+                <span class="text-[11px] text-slate-500">Each unit has its own history calendar, shift average, and selected-day 24-hour average.</span>
+            </div>
+            <div id="hourly-unit-tables" class="space-y-6"></div>
+        </section>
+
+        <section id="tab-moduli-calc" class="hidden space-y-6">
+            <div class="bg-slate-900 p-5 rounded-xl border border-slate-800 space-y-4">
+                <h2 class="text-base font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-calculator text-teal-400"></i> Quality Moduli & Bogue Compound Calculator
+                </h2>
+                <p class="text-xs text-slate-400">Calculate Lime Saturation Factor (LSF), Silica Modulus (SM), Alumina Modulus (AM), and Bogue potential phases (C3S, C2S, C3A, C4AF) in real-time.</p>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
+                    <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3 text-xs">
+                        <h3 class="font-semibold text-slate-200 border-b border-slate-800 pb-2">Oxide Input Mass Percentage (%)</h3>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                            <div>
+                                <label class="text-slate-400 block mb-1">SiO₂ (Silica)</label>
+                                <input type="number" step="0.01" id="calc-sio2" value="21.20" oninput="runModuliCalculator()" class="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-white focus:border-teal-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="text-slate-400 block mb-1">Al₂O₃ (Alumina)</label>
+                                <input type="number" step="0.01" id="calc-al2o3" value="5.30" oninput="runModuliCalculator()" class="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-white focus:border-teal-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="text-slate-400 block mb-1">Fe₂O₃ (Iron Oxide)</label>
+                                <input type="number" step="0.01" id="calc-fe2o3" value="3.20" oninput="runModuliCalculator()" class="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-white focus:border-teal-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="text-slate-400 block mb-1">CaO (Lime)</label>
+                                <input type="number" step="0.01" id="calc-cao" value="65.40" oninput="runModuliCalculator()" class="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-white focus:border-teal-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="text-slate-400 block mb-1">MgO (Magnesia)</label>
+                                <input type="number" step="0.01" id="calc-mgo" value="1.50" oninput="runModuliCalculator()" class="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-white focus:border-teal-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="text-slate-400 block mb-1">SO₃ (Sulfur Trioxide)</label>
+                                <input type="number" step="0.01" id="calc-so3" value="0.60" oninput="runModuliCalculator()" class="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-white focus:border-teal-500 focus:outline-none">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-4 text-xs">
+                        <h3 class="font-semibold text-slate-200 border-b border-slate-800 pb-2">Calculated Quality Parameters</h3>
+                        <div class="grid grid-cols-3 gap-3">
+                            <div class="bg-slate-900 p-3 rounded-lg border border-slate-800 text-center">
+                                <p class="text-slate-400 text-[11px]">LSF</p>
+                                <p id="calc-out-lsf" class="text-xl font-bold text-teal-400 mt-1">96.3</p>
+                            </div>
+                            <div class="bg-slate-900 p-3 rounded-lg border border-slate-800 text-center">
+                                <p class="text-slate-400 text-[11px]">SM</p>
+                                <p id="calc-out-sm" class="text-xl font-bold text-indigo-400 mt-1">2.49</p>
+                            </div>
+                            <div class="bg-slate-900 p-3 rounded-lg border border-slate-800 text-center">
+                                <p class="text-slate-400 text-[11px]">AM</p>
+                                <p id="calc-out-am" class="text-xl font-bold text-amber-400 mt-1">1.66</p>
+                            </div>
+                        </div>
+
+                        <div class="border-t border-slate-800 pt-3">
+                            <p class="font-semibold text-slate-300 mb-2">Bogue Potential Phase Calculation (%)</p>
+                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                <div class="bg-slate-900 p-2.5 rounded border border-slate-800 text-center">
+                                    <span class="text-slate-400 text-[10px] block">C3S (Alite)</span>
+                                    <span id="calc-out-c3s" class="text-sm font-bold text-emerald-400">58.4%</span>
+                                </div>
+                                <div class="bg-slate-900 p-2.5 rounded border border-slate-800 text-center">
+                                    <span class="text-slate-400 text-[10px] block">C2S (Belite)</span>
+                                    <span id="calc-out-c2s" class="text-sm font-bold text-cyan-400">16.2%</span>
+                                </div>
+                                <div class="bg-slate-900 p-2.5 rounded border border-slate-800 text-center">
+                                    <span class="text-slate-400 text-[10px] block">C3A (Aluminate)</span>
+                                    <span id="calc-out-c3a" class="text-sm font-bold text-amber-400">8.6%</span>
+                                </div>
+                                <div class="bg-slate-900 p-2.5 rounded border border-slate-800 text-center">
+                                    <span class="text-slate-400 text-[10px] block">C4AF (Ferrite)</span>
+                                    <span id="calc-out-c4af" class="text-sm font-bold text-rose-400">9.7%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="tab-reports" class="hidden space-y-6">
+            <div class="bg-slate-900 p-5 rounded-xl border border-slate-800 space-y-4 no-print">
+                <h2 class="text-base font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-file-contract text-teal-400"></i> Operational Quality Reports & Export
+                </h2>
+                <p class="text-xs text-slate-400">Export structured laboratory summaries, backup database JSON files, or generate printable compliance certificates.</p>
+                <div class="flex flex-wrap gap-3">
+                    <button onclick="generatePdfReport()" class="px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-lg text-xs font-semibold flex items-center gap-2 shadow">
+                        <i class="fa-solid fa-file-pdf"></i> Generate Full PDF Report
+                    </button>
+                    <span id="pdf-export-status" class="self-center text-[10px] font-mono text-emerald-400"></span>
+                    <button onclick="window.print()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold flex items-center gap-2 border border-slate-700">
+                        <i class="fa-solid fa-print"></i> Print / Save PDF Certificate
+                    </button>
+                    <button onclick="downloadJsonBackup()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold flex items-center gap-2 border border-slate-700">
+                        <i class="fa-solid fa-file-export"></i> Backup Database (.JSON)
+                    </button>
+                    <label class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold flex items-center gap-2 border border-slate-700 cursor-pointer">
+                        <i class="fa-solid fa-file-import"></i> Restore Data (.JSON)
+                        <input type="file" id="import-json-file" accept=".json" onchange="importJsonBackup(event)" class="hidden">
+                    </label>
+                </div>
+            </div>
+
+            <div class="print-card bg-slate-900 p-6 rounded-xl border border-slate-800 space-y-6">
+                <div class="flex justify-between items-start border-b border-slate-800 pb-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-white print-text-dark">PRO-LAB INDUSTRIAL QUALITY REPORT</h2>
+                        <p class="text-xs text-slate-400 print-text-dark">Plant Chemical Quality Control & Intake Summary</p>
+                    </div>
+                    <div class="text-right text-xs text-slate-400 print-text-dark">
+                        <p>Generated: <span id="report-generated-date" class="font-mono text-slate-200 print-text-dark">2026-09-20</span></p>
+                        <p>Status: <span class="text-emerald-400 font-bold">COMPLIANT</span></p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-4 text-xs">
+                    <div class="bg-slate-950 p-3 rounded border border-slate-800 print-card">
+                        <p class="text-slate-400 print-text-dark">Total Intake Volume</p>
+                        <p id="report-intake-vol" class="text-base font-bold text-teal-400 print-text-dark">0.0 Tonnes</p>
+                    </div>
+                    <div class="bg-slate-950 p-3 rounded border border-slate-800 print-card">
+                        <p class="text-slate-400 print-text-dark">Kiln Feed Avg LSF</p>
+                        <p id="report-avg-lsf" class="text-base font-bold text-emerald-400 print-text-dark">96.4</p>
+                    </div>
+                    <div class="bg-slate-950 p-3 rounded border border-slate-800 print-card">
+                        <p class="text-slate-400 print-text-dark">Coal Avg Energy</p>
+                        <p id="report-avg-gcv" class="text-base font-bold text-amber-400 print-text-dark">5,840 kcal/kg</p>
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <h4 class="text-xs font-bold text-slate-200 uppercase tracking-wider print-text-dark">Active Hourly Quality Logs</h4>
+                    <div id="report-unit-tables" class="space-y-4"></div>
+                </div>
+            </div>
+        </section>
+
+        <section id="tab-settings" class="hidden space-y-6">
+            <div class="bg-slate-900 p-5 rounded-xl border border-slate-800 space-y-4">
+                <h2 class="text-base font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-database text-teal-400"></i> Local Database Maintenance & Target Setup
+                </h2>
+                <p class="text-xs text-slate-400">All data is maintained locally inside your web browser HTML5 LocalStorage engine.</p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                    <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+                        <h3 class="text-xs font-semibold text-slate-200">Database Statistics</h3>
+                        <ul class="text-xs text-slate-400 space-y-1.5">
+                            <li class="flex justify-between"><span>Raw Material Records:</span> <strong id="stat-rm-count" class="text-slate-200">0</strong></li>
+                            <li class="flex justify-between"><span>Hourly Chemistry Logs:</span> <strong id="stat-hl-count" class="text-slate-200">0</strong></li>
+                            <li class="flex justify-between"><span>Storage Engine:</span> <strong class="text-emerald-400">Browser LocalStorage</strong></li>
+                        </ul>
+                    </div>
+
+                    <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+                        <h3 class="text-xs font-semibold text-slate-200">Reset System</h3>
+                        <p class="text-xs text-slate-400">Clear local database storage and reload default SOP parameters.</p>
+                        <button onclick="clearDatabase()" class="px-3.5 py-2 bg-rose-600/80 hover:bg-rose-500 text-white rounded-lg text-xs font-semibold flex items-center gap-2 transition">
+                            <i class="fa-solid fa-trash-can"></i> Reset Demo Database
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div id="modal-raw-material" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-truck-field text-amber-400"></i> New Material Delivery Ticket
+                </h3>
+                <button onclick="closeModal('modal-raw-material')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <form onsubmit="saveRawMaterialEntry(event)" class="space-y-3 text-xs">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-slate-400 mb-1">Ticket No</label>
+                        <input type="text" id="form-rm-ticket" required class="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">Material</label>
+                        <select id="form-rm-material" class="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white">
+                            <option value="Limestone">Limestone</option>
+                            <option value="Clay">Clay</option>
+                            <option value="Sand">Sand</option>
+                            <option value="Coal">Coal</option>
+                            <option value="Gypsum">Gypsum</option>
+                            <option value="Iron Ore">Iron Ore</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-slate-400 mb-1">Supplier</label>
+                        <input type="text" id="form-rm-supplier" required class="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">Net Weight (Tonnes)</label>
+                        <input type="number" step="0.01" id="form-rm-tonnes" required class="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white">
+                    </div>
+                </div>
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-slate-400 mb-1">Moisture %</label>
+                        <input type="number" step="0.1" id="form-rm-moisture" value="5.0" class="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">Ash %</label>
+                        <input type="number" step="0.1" id="form-rm-ash" value="12.0" class="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">GCV (kcal/kg)</label>
+                        <input type="number" id="form-rm-gcv" value="5800" class="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white">
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 pt-3 border-t border-slate-800">
+                    <button type="button" onclick="closeModal('modal-raw-material')" class="px-4 py-2 bg-slate-800 text-slate-300 rounded hover:bg-slate-700">Cancel</button>
+                    <button type="submit" class="px-4 py-2 bg-amber-600 text-white rounded font-semibold hover:bg-amber-500">Save Delivery Record</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modal-hourly-log" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+        <div class="relative bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full h-[90vh] max-h-[90vh] flex flex-col shadow-2xl">
+            <div class="sticky top-0 z-10 flex items-center justify-between bg-slate-900 border-b border-slate-800 p-6 pb-3 rounded-t-2xl">
+                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-vial text-teal-400"></i> Record Hourly Sample Analysis
+                </h3>
+                <button type="button" onclick="closeModal('modal-hourly-log')" aria-label="Close hourly sample form" class="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg text-lg transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <form id="hourly-log-form" onsubmit="saveHourlyLogEntry(event)" class="flex-1 min-h-0 space-y-3 text-xs overflow-y-auto p-6 pt-4 pb-28" style="padding-bottom: 7rem;">
+                <input type="hidden" id="form-hl-edit-id" value="">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-slate-400 mb-1">Sample Date</label>
+                        <input type="date" id="form-hl-date" class="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">Process Hour</label>
+                        <select id="form-hl-hour" class="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white">
+                            <option value="00:00">00:00</option><option value="01:00">01:00</option><option value="02:00">02:00</option><option value="03:00">03:00</option><option value="04:00">04:00</option><option value="05:00">05:00</option>
+                            <option value="06:00">06:00</option><option value="07:00">07:00</option><option value="08:00">08:00</option><option value="09:00">09:00</option><option value="10:00">10:00</option><option value="11:00">11:00</option>
+                            <option value="12:00">12:00</option><option value="13:00">13:00</option><option value="14:00">14:00</option><option value="15:00">15:00</option><option value="16:00">16:00</option><option value="17:00">17:00</option>
+                            <option value="18:00">18:00</option><option value="19:00">19:00</option><option value="20:00">20:00</option><option value="21:00">21:00</option><option value="22:00">22:00</option><option value="23:00">23:00</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-slate-400 mb-1">Process Unit</label>
+                        <select id="form-hl-point" onchange="toggleProcessUnitFields()" class="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white">
+                            <optgroup label="Raw Mill">
+                                <option value="Raw Mill">Raw Mill</option>
+                            </optgroup>
+                            <optgroup label="Kilns">
+                                <option value="Kiln #1">Kiln #1</option>
+                                <option value="Kiln #2">Kiln #2</option>
+                            </optgroup>
+                            <optgroup label="Cement Mills">
+                                <option value="Cement Mill #2">Cement Mill #2</option>
+                                <option value="Cement Mill #3">Cement Mill #3</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1">Shift</label>
+                        <select id="form-hl-shift" class="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white">
+                            <option value="Shift A">Shift A (08:00 - 15:00)</option>
+                            <option value="Shift B">Shift B (16:00 - 23:00)</option>
+                            <option value="Shift C">Shift C (00:00 - 07:00)</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="cement-mill-fields" class="hidden bg-indigo-950/30 border border-indigo-800/60 rounded-lg p-3 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <h4 class="font-semibold text-indigo-200">Cement Mill Process-Control Tests</h4>
+                        <span class="text-[10px] text-indigo-300 uppercase">Shift record</span>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div>
+                            <label class="block text-slate-400 mb-1">SO₃ %</label>
+                            <input type="number" step="0.01" id="form-hl-cement-so3" class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white">
+                        </div>
+                        <div>
+                            <label class="block text-slate-400 mb-1">Fineness 45 µm (%)</label>
+                            <input type="number" step="0.01" id="form-hl-fineness-45" class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white">
+                        </div>
+                        <div>
+                            <label class="block text-slate-400 mb-1">Fineness 80 µm (%)</label>
+                            <input type="number" step="0.01" id="form-hl-fineness-80" class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white">
+                        </div>
+                        <div>
+                            <label class="block text-slate-400 mb-1">Additive %</label>
+                            <input type="number" step="0.01" min="0" id="form-hl-additive" class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="block text-slate-400 mb-1">Cement Temperature °C</label>
+                            <input type="number" step="0.1" id="form-hl-cement-temp" class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white">
+                        </div>
+                        <div>
+                            <label class="block text-slate-400 mb-1">Separator Frequency Hz</label>
+                            <input type="number" step="0.1" id="form-hl-separator-hz" class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white">
+                        </div>
+                        <div>
+                            <label class="block text-slate-400 mb-1">TPH</label>
+                            <input type="number" step="0.01" min="0" id="form-hl-feed-rate" class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white">
+                        </div>
+                        <div>
+                            <label class="block text-slate-400 mb-1">Silo</label>
+                            <select id="form-hl-silo" class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white"></select>
+                        </div>
+                        <div>
+                            <label class="block text-slate-400 mb-1">Cement Type</label>
+                            <select id="form-hl-cement-type" class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white">
+                                <option value="42.5">42.5</option>
+                                <option value="32.5">32.5</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="border-t border-indigo-800/50 pt-3">
+                        <div class="flex items-center justify-between mb-2">
+                            <h4 class="font-semibold text-indigo-200">Cement Mill Weight Feeders</h4>
+                            <div class="flex items-center gap-2">
+                                <button type="button" onclick="loadLatestFeederData('cement')" class="px-2.5 py-1 bg-indigo-700 hover:bg-indigo-600 rounded text-[10px] font-semibold text-white">Load Last Data</button>
+                                <span id="feeder-ratio-total" class="text-xs font-bold text-amber-300">Total ratio: 0.00%</span>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            <div class="grid grid-cols-[1fr_100px] gap-2 items-center"><label class="text-center text-slate-400">WF1 %</label><div class="grid grid-cols-2 gap-2"><input type="text" id="form-hl-feeder-name-1" placeholder="Material" class="bg-slate-950 border border-slate-800 rounded px-2 py-1.5 text-white"><input type="number" step="0.01" min="0" max="100" id="form-hl-feeder-ratio-1" placeholder="Ratio %" oninput="updateFeederRatioTotal()" class="bg-slate-950 border border-slate-800 rounded px-2 py-1.5 text-white"></div></div>
+                            <div class="grid grid-cols-[1fr_100px] gap-2 items-center"><label class="text-center text-slate-400">WF2 %</label><div class="grid grid-cols-2 gap-2"><input type="text" id="form-hl-feeder-name-2" placeholder="Material" class="bg-slate-950 border border-slate-800 rounded px-2 py-1.5 text-white"><input type="number" step="0.01" min="0" max="100" id="form-hl-feeder-ratio-2" placeholder="Ratio %" oninput="updateFeederRatioTotal()" class="bg-slate-950 border border-slate-800 rounded px-2 py-1.5 text-white"></div></div>
+                            <div class="grid grid-cols-[1fr_100px] gap-2 items-center"><label class="text-center text-slate-400">WF3 %</label><div class="grid grid-cols-2 gap-2"><input type="text" id="form-hl-feeder-name-3" placeholder="Material" class="bg-slate-950 border border-slate-800 rounded px-2 py-1.5 text-white"><input type="number" step="0.01" min="0" max="100" id="form-hl-feeder-ratio-3" placeholder="Ratio %" oninput="updateFeederRatioTotal()" class="bg-slate-950 border border-slate-800 rounded px-2 py-1.5 text-white"></div></div>
+                            <div class="grid grid-cols-[1fr_100px] gap-2 items-center"><label class="text-center text-slate-400">WF4 %</label><div class="grid grid-cols-2 gap-2"><input type="text" id="form-hl-feeder-name-4" placeholder="Material" class="bg-slate-950 border border-slate-800 rounded px-2 py-1.5 text-white"><input type="number" step="0.01" min="0" max="100" id="form-hl-feeder-ratio-4" placeholder="Ratio %" oninput="updateFeederRatioTotal()" class="bg-slate-950 border border-slate-800 rounded px-2 py-1.5 text-white"></div></div>
+                            <div class="grid grid-cols-[1fr_100px] gap-2 items-center"><label class="text-center text-slate-400">WF5 %</label><div class="grid grid-cols-2 gap-2"><input type="text" id="form-hl-feeder-name-5" placeholder="Material" class="bg-slate-950 border border-slate-800 rounded px-2 py-1.5 text-white"><input type="number" step="0.01" min="0" max="100" id="form-hl-feeder-ratio-5" placeholder="Ratio %" oninput="updateFeederRatioTotal()" class="bg-slate-950 border border-slate-800 rounded px-2 py-1.5 text-white"></div></div>
+                            <div class="grid grid-cols-[1fr_100px] gap-2 items-center"><label class="text-center text-slate-400">WF6 %</label><div class="grid grid-cols-2 gap-2"><input type="text" id="form-hl-feeder-name-6" placeholder="Material" class="bg-slate-950 border border-slate-800 rounded px-2 py-1.5 text-white"><input type="number" step="0.01" min="0" max="100" id="form-hl-feeder-ratio-6" placeholder="Ratio %" oninput="updateFeederRatioTotal()" class="bg-slate-950 border border-slate-800 rounded px-2 py-1.5 text-white"></div></div>
+                        </div>
+                        <p class="text-[10px] text-slate-500 mt-2">Enter the material name and ratio for each feeder. The six ratios must total exactly 100%.</p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3 border-t border-indigo-800/50 pt-3">
+                        <div>
+                            <label class="block text-slate-400 mb-1">Gypsum Moisture % <span class="text-[10px] text-indigo-300">(once/shift)</span></label>
+                            <input type="number" step="0.01" id="form-hl-gypsum-moisture" class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white">
+                        </div>
+                        <div>
+                            <label class="block text-slate-400 mb-1">Pozzolana Moisture % <span class="text-[10px] text-indigo-300">(once/shift)</span></label>
+                            <input type="number" step="0.01" id="form-hl-pozzolana-moisture" class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white">
+                        </div>
+                    </div>
+                </div>
+                <div id="kiln-fields" class="hidden space-y-3 bg-amber-950/20 border border-amber-800/60 rounded-lg p-3">
+                    <div class="text-sm font-semibold text-amber-200">Kiln Feed & Clinker Process Control</div>
+                    <div class="text-[10px] text-amber-300">When the kiln is running, clinker free lime, clinker LOI, kiln feed rate, and discharge rate must be recorded every hour. Kiln-feed chemistry and nodule tests are optional when not required.</div>
+                    <div class="max-w-xs">
+                        <label class="block text-slate-400 mb-1">Kiln Operating Status</label>
+                        <select id="form-hl-kiln-status" onchange="toggleProcessUnitFields()" class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white">
+                            <option value="Running">Running</option>
+                            <option value="Stopped">Stopped</option>
+                        </select>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div><label class="block text-slate-400 mb-1">SiO₂ (%)</label><input type="number" step="0.01" id="form-hl-kiln-sio2" oninput="updateKilnFeedModuli()" class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white"></div>
+                        <div><label class="block text-slate-400 mb-1">Al₂O₃ (%)</label><input type="number" step="0.01" id="form-hl-kiln-al2o3" oninput="updateKilnFeedModuli()" class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white"></div>
+                        <div><label class="block text-slate-400 mb-1">Fe₂O₃ (%)</label><input type="number" step="0.01" id="form-hl-kiln-fe2o3" oninput="updateKilnFeedModuli()" class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white"></div>
+                        <div><label class="block text-slate-400 mb-1">CaO (%)</label><input type="number" step="0.01" id="form-hl-kiln-cao" oninput="updateKilnFeedModuli()" class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white"></div>
+                        <div><label class="block text-slate-400 mb-1">LOI (%)</label><input type="number" step="0.01" id="form-hl-kiln-loi" class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white"></div>
+                        <div><label class="block text-slate-400 mb-1">CV (kcal/kg)</label><input type="number" step="1" min="0" id="form-hl-kiln-cv" class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white"></div>
+                        <div><label class="block text-slate-400 mb-1">Nodule Size</label><input type="number" step="0.01" min="0" id="form-hl-nodule-size" class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white"></div>
+                        <div><label class="block text-slate-400 mb-1">Nodule Moisture (%)</label><input type="number" step="0.01" min="0" id="form-hl-nodule-moisture" class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white"></div>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 border-t border-amber-800/50 pt-3">
+                        <div><label class="block text-slate-400 mb-1">LSF</label><input type="text" id="form-hl-kiln-lsf" readonly class="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-amber-200"></div>
+                        <div><label class="block text-slate-400 mb-1">SM</label><input type="text" id="form-hl-kiln-sm" readonly class="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-amber-200"></div>
+                        <div><label class="block text-slate-400 mb-1">AM</label><input type="text" id="form-hl-kiln-am" readonly class="w-full bg-slate-900 border border-slate-800 rounded px-2.5 py-1.5 text-amber-200"></div>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 border-t border-amber-800/50 pt-3">
+                        <div><label class="block text-slate-400 mb-1">Clinker Free Lime (%)</label><input type="number" step="0.01" min="0" id="form-hl-clinker-free-lime" required class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white"></div>
+                        <div><label class="block text-slate-400 mb-1">Clinker LOI (%)</label><input type="number" step="0.01" min="0" id="form-hl-clinker-loi" class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white"></div>
+                        <div><label class="block text-slate-400 mb-1">Feed Rate (TPH)</label><input type="number" step="0.01" min="0" id="form-hl-kiln-feed-rate" required class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white"></div>
+                        <div><label class="block text-slate-400 mb-1">Discharge Rate (TPH)</label><input type="number" step="0.01" min="0" id="form-hl-discharge-rate" required class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white"></div>
+                        <div><label class="block text-slate-400 mb-1">Silo</label><select id="form-hl-kiln-silo" class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white"></select></div>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-slate-400 mb-1">Machine Status / Shift Remark</label>
+                    <textarea id="form-hl-remark" rows="2" placeholder="Record machine condition, adjustment, stoppage, or operator remark" class="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white"></textarea>
+                </div>
+                <div id="raw-mill-fields" class="hidden space-y-3 bg-teal-950/20 border border-teal-800/60 rounded-lg p-3">
+                    <div class="text-sm font-semibold text-teal-200">Raw Mill Process Control</div>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div>
+                            <label class="block text-slate-400 mb-1">SiO₂ (%)</label>
+                            <input type="number" step="0.01" id="form-hl-sio2" value="21.20" oninput="updateRawMillModuli()" required class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white">
+                        </div>
+                        <div>
+                            <label class="block text-slate-400 mb-1">Al₂O₃ (%)</label>
+                            <input type="number" step="0.01" id="form-hl-al2o3" value="5.30" oninput="updateRawMillModuli()" required class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white">
+                        </div>
+                        <div>
+                            <label class="block text-slate-400 mb-1">Fe₂O₃ (%)</label>
+                            <input type="number" step="0.01" id="form-hl-fe2o3" value="3.20" oninput="updateRawMillModuli()" required class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white">
+                        </div>
+                        <div>
+                            <label class="block text-slate-400 mb-1">CaO (%)</label>
+                            <input type="number" step="0.01" id="form-hl-cao" value="65.40" oninput="updateRawMillModuli()" required class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white">
+                        </div>
+                        <div>
+                            <label class="block text-slate-400 mb-1">LOI (%)</label>
+                            <input type="number" step="0.01" id="form-hl-loi" class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white">
+                        </div>
+                        <div><label class="block text-slate-400 mb-1">LSF</label><input type="number" step="0.01" id="form-hl-lsf" readonly class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white"></div>
+                        <div><label class="block text-slate-400 mb-1">SM</label><input type="number" step="0.01" id="form-hl-sm" readonly class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white"></div>
+                        <div><label class="block text-slate-400 mb-1">AM</label><input type="number" step="0.01" id="form-hl-am" readonly class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white"></div>
+                        <div><label class="block text-slate-400 mb-1">CV (kcal/kg)</label><input type="number" step="1" min="0" id="form-hl-cv" class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white"></div>
+                        <div><label class="block text-slate-400 mb-1">Residue at 80 µm (%)</label><input type="number" step="0.01" min="0" id="form-hl-residue-80" class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white"></div>
+                        <div><label class="block text-slate-400 mb-1">Silo</label><select id="form-hl-raw-silo" class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white"></select></div>
+                        <div><label class="block text-slate-400 mb-1">TPH</label><input type="number" step="0.01" min="0" id="form-hl-raw-feed-rate" class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white"></div>
+                        <div><label class="block text-slate-400 mb-1">Separator Frequency (Hz)</label><input type="number" step="0.1" min="0" id="form-hl-raw-separator" class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white"></div>
+                        <div><label class="block text-slate-400 mb-1">Mill Current (A)</label><input type="number" step="0.1" min="0" id="form-hl-mill-current" class="w-full bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-white"></div>
+                    </div>
+                    <div class="border-t border-teal-800/50 pt-3">
+                        <div class="flex items-center justify-between mb-2">
+                            <h4 class="font-semibold text-teal-200">Raw Mill Weight Feeders</h4>
+                            <div class="flex items-center gap-2">
+                                <button type="button" onclick="loadLatestFeederData('raw')" class="px-2.5 py-1 bg-teal-700 hover:bg-teal-600 rounded text-[10px] font-semibold text-white">Load Last Data</button>
+                                <span id="raw-feeder-ratio-total" class="text-xs font-bold text-amber-300">Total: 0.00%</span>
+                            </div>
+                        </div>
+                        <div class="hidden md:grid grid-cols-[52px_1fr_84px_84px] gap-2 mb-1 text-[10px] tracking-wide text-slate-500">
+                            <span class="text-center">WF</span><span>Material</span><span class="text-center">Ratio (%)</span><span class="text-center">Moisture (%)</span>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            <div class="grid grid-cols-[52px_1fr_84px_84px] gap-2 items-center"><label class="text-center text-slate-400">WF1</label><input type="text" id="form-hl-raw-feeder-name-1" placeholder="Material" oninput="updateRawFeederMoistureLabels()" class="bg-slate-950 border border-slate-800 rounded px-2 py-1.5 text-white"><input type="number" step="0.01" min="0" max="100" id="form-hl-raw-feeder-ratio-1" placeholder="Ratio %" oninput="updateRawFeederRatioTotal()" class="bg-slate-950 border border-slate-800 rounded px-2 py-1.5 text-white"><input type="number" step="0.01" min="0" id="form-hl-raw-feeder-moisture-1" placeholder="Moisture %" class="bg-slate-950 border border-slate-800 rounded px-2 py-1.5 text-white"></div>
+                            <div class="grid grid-cols-[52px_1fr_84px_84px] gap-2 items-center"><label class="text-center text-slate-400">WF2</label><input type="text" id="form-hl-raw-feeder-name-2" placeholder="Material" oninput="updateRawFeederMoistureLabels()" class="bg-slate-950 border border-slate-800 rounded px-2 py-1.5 text-white"><input type="number" step="0.01" min="0" max="100" id="form-hl-raw-feeder-ratio-2" placeholder="Ratio %" oninput="updateRawFeederRatioTotal()" class="bg-slate-950 border border-slate-800 rounded px-2 py-1.5 text-white"><input type="number" step="0.01" min="0" id="form-hl-raw-feeder-moisture-2" placeholder="Moisture %" class="bg-slate-950 border border-slate-800 rounded px-2 py-1.5 text-white"></div>
+                            <div class="grid grid-cols-[52px_1fr_84px_84px] gap-2 items-center"><label class="text-center text-slate-400">WF3</label><input type="text" id="form-hl-raw-feeder-name-3" placeholder="Material" oninput="updateRawFeederMoistureLabels()" class="bg-slate-950 border border-slate-800 rounded px-2 py-1.5 text-white"><input type="number" step="0.01" min="0" max="100" id="form-hl-raw-feeder-ratio-3" placeholder="Ratio %" oninput="updateRawFeederRatioTotal()" class="bg-slate-950 border border-slate-800 rounded px-2 py-1.5 text-white"><input type="number" step="0.01" min="0" id="form-hl-raw-feeder-moisture-3" placeholder="Moisture %" class="bg-slate-950 border border-slate-800 rounded px-2 py-1.5 text-white"></div>
+                            <div class="grid grid-cols-[52px_1fr_84px_84px] gap-2 items-center"><label class="text-center text-slate-400">WF4</label><input type="text" id="form-hl-raw-feeder-name-4" placeholder="Material" oninput="updateRawFeederMoistureLabels()" class="bg-slate-950 border border-slate-800 rounded px-2 py-1.5 text-white"><input type="number" step="0.01" min="0" max="100" id="form-hl-raw-feeder-ratio-4" placeholder="Ratio %" oninput="updateRawFeederRatioTotal()" class="bg-slate-950 border border-slate-800 rounded px-2 py-1.5 text-white"><input type="number" step="0.01" min="0" id="form-hl-raw-feeder-moisture-4" placeholder="Moisture %" class="bg-slate-950 border border-slate-800 rounded px-2 py-1.5 text-white"></div>
+                            <div class="grid grid-cols-[52px_1fr_84px_84px] gap-2 items-center"><label class="text-center text-slate-400">WF5</label><input type="text" id="form-hl-raw-feeder-name-5" placeholder="Material" oninput="updateRawFeederMoistureLabels()" class="bg-slate-950 border border-slate-800 rounded px-2 py-1.5 text-white"><input type="number" step="0.01" min="0" max="100" id="form-hl-raw-feeder-ratio-5" placeholder="Ratio %" oninput="updateRawFeederRatioTotal()" class="bg-slate-950 border border-slate-800 rounded px-2 py-1.5 text-white"><input type="number" step="0.01" min="0" id="form-hl-raw-feeder-moisture-5" placeholder="Moisture %" class="bg-slate-950 border border-slate-800 rounded px-2 py-1.5 text-white"></div>
+                            <div class="grid grid-cols-[52px_1fr_84px_84px] gap-2 items-center"><label class="text-center text-slate-400">WF6</label><input type="text" id="form-hl-raw-feeder-name-6" placeholder="Material" oninput="updateRawFeederMoistureLabels()" class="bg-slate-950 border border-slate-800 rounded px-2 py-1.5 text-white"><input type="number" step="0.01" min="0" max="100" id="form-hl-raw-feeder-ratio-6" placeholder="Ratio %" oninput="updateRawFeederRatioTotal()" class="bg-slate-950 border border-slate-800 rounded px-2 py-1.5 text-white"><input type="number" step="0.01" min="0" id="form-hl-raw-feeder-moisture-6" placeholder="Moisture %" class="bg-slate-950 border border-slate-800 rounded px-2 py-1.5 text-white"></div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+            <div id="hourly-log-actions" class="absolute bottom-0 left-0 right-0 flex justify-end gap-2 p-6 pt-3 bg-slate-900 border-t border-slate-800 z-20" style="position: absolute; bottom: 0; left: 0; right: 0; display: flex; visibility: visible; opacity: 1;">
+                <button type="button" onclick="closeModal('modal-hourly-log')" class="px-4 py-2 bg-slate-800 text-slate-300 rounded hover:bg-slate-700">Cancel</button>
+                <button id="hourly-log-submit" form="hourly-log-form" type="submit" class="px-4 py-2 bg-teal-600 text-white rounded font-semibold hover:bg-teal-500">Save Hourly Log</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-sop-mapping" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-sliders text-teal-400"></i> Plant SOP Quality Target Limits
+                </h3>
+                <button onclick="closeModal('modal-sop-mapping')" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="space-y-3 text-xs">
+                <div>
+                    <label class="block text-slate-400 mb-1">LSF Target Range (Min - Max)</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="number" step="0.1" id="target-lsf-min" value="95.0" class="bg-slate-950 border border-slate-800 rounded px-3 py-1.5 text-white">
+                        <input type="number" step="0.1" id="target-lsf-max" value="98.0" class="bg-slate-950 border border-slate-800 rounded px-3 py-1.5 text-white">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-slate-400 mb-1">SM Target Range (Min - Max)</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="number" step="0.01" id="target-sm-min" value="2.30" class="bg-slate-950 border border-slate-800 rounded px-3 py-1.5 text-white">
+                        <input type="number" step="0.01" id="target-sm-max" value="2.70" class="bg-slate-950 border border-slate-800 rounded px-3 py-1.5 text-white">
+                    </div>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-3 border-t border-slate-800">
+                <button onclick="saveSopTargets()" class="px-4 py-2 bg-teal-600 text-white rounded font-semibold text-xs hover:bg-teal-500">Apply Target Limits</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>

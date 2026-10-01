@@ -1,0 +1,16 @@
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #0f172a; }
+::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #475569; }
+#raw-mill-fields input { min-width: 0; width: 100%; }
+#raw-mill-fields [id^="form-hl-raw-feeder-name-"] { overflow: hidden; text-overflow: ellipsis; }
+#raw-mill-fields [id^="form-hl-raw-feeder-ratio-"],
+#raw-mill-fields [id^="form-hl-raw-feeder-moisture-"] { font-size: 0.75rem; }
+.feeder-table-cell { padding-left: 0.25rem !important; padding-right: 0.25rem !important; font-size: 0.65rem; line-height: 1.15; }
+.feeder-table-cell .truncate { max-width: 4.5rem; margin-left: auto; margin-right: auto; }
+@media print {
+    .no-print { display: none !important; }
+    body { background: white !important; color: black !important; }
+    .print-card { background: white !important; border: 1px solid #ccc !important; color: black !important; box-shadow: none !important; }
+    .print-text-dark { color: #1e293b !important; }
+}
